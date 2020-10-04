@@ -7,28 +7,33 @@
 //
 
 import XCTest
+import CoreData
 @testable import Unsplash
 
 class UnsplashTests: XCTestCase {
-
+    
+    var context: NSManagedObjectContext!
+    
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
+        context = InMemoryContextBuilder().persistentContainer.viewContext
     }
 
     override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
+        context = nil
     }
-
-    func testExample() throws {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+    
+    func test_jsonFile_photo_count() {
+        let fileURL = Bundle.main.url(forResource: "TestJson", withExtension: "json")
+        XCTAssertNotNil(fileURL)
+        var data: Data? = nil
+        XCTAssertNoThrow(data = try Data(contentsOf: fileURL!))
+        XCTAssertNotNil(data)
+        let decoder = JSONDecoder()
+        decoder.userInfo[CodingUserInfoKey.context!] = context
+        decoder.userInfo[CodingUserInfoKey.page!] = Int16(integerLiteral: 0)
+        var photos: [PhotoItem]? = nil
+        XCTAssertNoThrow(photos = try decoder.decode([PhotoItem].self, from: data!))
+        XCTAssertEqual(photos!.count, 10)
     }
-
-    func testPerformanceExample() throws {
-        // This is an example of a performance test case.
-        self.measure {
-            // Put the code you want to measure the time of here.
-        }
-    }
-
+    
 }
