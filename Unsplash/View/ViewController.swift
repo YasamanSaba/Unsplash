@@ -9,54 +9,33 @@
 import UIKit
 
 class ViewController: UIViewController {
-    
-    var photos: [PhotoItem] = [] //Photo.allPhotos()
-    
+    // MARK: - Properties
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+    var photoViewModel: PhotoViewModel!
     lazy var randomImage: UIImageView = {
         let image = UIImageView()
+        image.backgroundColor = .systemGray5
         image.translatesAutoresizingMaskIntoConstraints = false
         image.clipsToBounds = true
-        //image.image = #imageLiteral(resourceName: "8")
-        image.contentMode = .scaleToFill
         self.view.addSubview(image)
         return image
     }()
-    
-    //    func layoutCollectionView() -> UICollectionViewCompositionalLayout {
-    //        let itemSize = NSCollectionLayoutSize(
-    //          widthDimension: .fractionalWidth(1.0),
-    //          heightDimension: .fractionalHeight(1.0))
-    //        let fullPhotoItem = NSCollectionLayoutItem(layoutSize: itemSize)
-    //        fullPhotoItem.contentInsets = NSDirectionalEdgeInsets(top: 2, leading: 2, bottom: 2, trailing: 2)
-    //        let groupSize = NSCollectionLayoutSize(
-    //          widthDimension: .fractionalWidth(1.0),
-    //          heightDimension: .fractionalWidth(1/3))
-    //        let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitem: fullPhotoItem, count: 2)
-    //
-    //        let section = NSCollectionLayoutSection(group: group)
-    //
-    //        let layout = UICollectionViewCompositionalLayout(section: section)
-    //        return layout
-    //    }
-    
     lazy var imageCollectionView: UICollectionView = {
         let collectionView = UICollectionView(frame: view.bounds, collectionViewLayout: PinterestLayout())
         self.view.addSubview(collectionView)
         collectionView.backgroundColor = .systemBackground
-        collectionView.register(ImageCollectionViewCell.self, forCellWithReuseIdentifier: ImageCollectionViewCell.reuseId)
+        collectionView.register(PhotoCollectionViewCell.self, forCellWithReuseIdentifier: PhotoCollectionViewCell.reuseId)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         return collectionView
     }()
-    
+    var timer: Timer?
+    var randomImageHeight: NSLayoutConstraint?
+    // MARK: - LifeCycle
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        if let layout = imageCollectionView.collectionViewLayout as? PinterestLayout {
-            layout.delegate = self
-        }
-        imageCollectionView.dataSource = self
+        randomImageHeight = NSLayoutConstraint(item: randomImage, attribute: .height, relatedBy: .equal, toItem: nil, attribute: .height, multiplier: 1, constant: 100)
         NSLayoutConstraint.activate([
-            randomImage.heightAnchor.constraint(equalTo: self.view.heightAnchor, multiplier: 1/5),
+            randomImageHeight!,
             randomImage.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
             randomImage.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
             randomImage.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
@@ -64,32 +43,26 @@ class ViewController: UIViewController {
             imageCollectionView.widthAnchor.constraint(equalTo: self.view.widthAnchor),
             imageCollectionView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
         ])
+        let photoService = PhotoService(context: context)
+        self.photoViewModel = PhotoViewModel(photoService: photoService)
+        self.photoViewModel.start(photoCollectionView: imageCollectionView)
     }
-    
-}
-
-extension ViewController: UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
-
-    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-      return photos.count
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        timer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { _ in
+            self.photoViewModel.giveRandomPhoto(width: Int(self.randomImage.bounds.width)) { image, color in
+                DispatchQueue.main.async {
+                    self.randomImageHeight?.constant = image.size.height
+                    UIView.animate(withDuration: 0.5) { [weak self] in
+                        self?.view.layoutIfNeeded()
+                    }
+                    self.randomImage.image = image
+                    self.randomImage.backgroundColor = color
+                }
+            }
+        }
     }
-    
-    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-      let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ImageCollectionViewCell.reuseId, for: indexPath as IndexPath) as! ImageCollectionViewCell
-      cell.photo = photos[indexPath.item]
-      return cell
+    override func viewWillDisappear(_ animated: Bool) {
+        timer?.invalidate()
     }
-    
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-      let itemSize = (collectionView.frame.width - (collectionView.contentInset.left + collectionView.contentInset.right + 10)) / 2
-      return CGSize(width: itemSize, height: itemSize)
-    }
-}
-
-extension ViewController: PinterestLayoutDelegate {
-  func collectionView(
-    _ collectionView: UICollectionView,
-    heightForPhotoAtIndexPath indexPath:IndexPath) -> CGFloat {
-    return 10//photos[indexPath.item].image.size.height
-  }
 }
